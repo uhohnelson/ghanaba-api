@@ -1,14 +1,37 @@
 from flask import Flask, request, jsonify
+import requests
 import os
 
 app = Flask(__name__)
 
-def generate_ghanaba_response(topic):
-    return f"Ah {topic}? Okay make I break am down. Imagine say you dey Accra, and this thing happen like when ECG take light after you just buy cold minerals. That na the kind vibe we dey talk about. 😂"
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')  # Make sure you set this in your Render environment
+GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
 
-@app.route('/')
-def home():
-    return "Welcome to Ghanaba API. It's alive!"
+def generate_ghanaba_response(topic):
+    headers = {
+        'Content-Type': 'application/json',
+    }
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": f"Explain {topic} in a fun Ghanaian style like Ghanaba would."}
+                ]
+            }
+        ]
+    }
+
+    response = requests.post(GEMINI_API_URL, json=payload, headers=headers)
+
+    if response.status_code == 200:
+        data = response.json()
+        try:
+            generated_text = data['candidates'][0]['content']
+            return generated_text
+        except (KeyError, IndexError):
+            return "Sorry, no explanation was generated."
+    else:
+        return f"Error from Gemini API: {response.status_code} - {response.text}"
 
 @app.route('/explain', methods=['POST'])
 def explain():
@@ -16,8 +39,13 @@ def explain():
     topic = data.get('topic', '')
     if not topic:
         return jsonify({"error": "No topic provided"}), 400
+
     explanation = generate_ghanaba_response(topic)
     return jsonify({"response": explanation})
+
+@app.route('/')
+def home():
+    return "Welcome to Ghanaba API. It's alive!"
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
