@@ -1,9 +1,14 @@
 from flask import Flask, request, jsonify
+import os
 
 app = Flask(__name__)
 
 def generate_ghanaba_response(topic):
     return f"Ah {topic}? Okay make I break am down. Imagine say you dey Accra, and this thing happen like when ECG take light after you just buy cold minerals. That na the kind vibe we dey talk about. 😂"
+
+@app.route('/')
+def home():
+    return "Welcome to Ghanaba API. It's alive!"
 
 @app.route('/explain', methods=['POST'])
 def explain():
@@ -14,12 +19,6 @@ def explain():
     explanation = generate_ghanaba_response(topic)
     return jsonify({"response": explanation})
 
-import os
-
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
-
-@app.route('/')
-def home():
-    return "Welcome to Ghanaba API. It's alive!"
