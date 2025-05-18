@@ -38,7 +38,7 @@ def generate_ghanaba_response(topic):
         return f"Error from Gemini API: {response.status_code} - {response.text}"
 
 # POST endpoint for explanations
-@app.route('/explain', methods=['POST'])
+@app.route('/api/explain', methods=['POST'])
 def explain():
     data = request.json
     topic = data.get('topic', '')
