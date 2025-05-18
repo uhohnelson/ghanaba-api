@@ -9,54 +9,40 @@ CORS(app)
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
 
-RICH_SMART_PROMPT = """
-You're explaining {topic} to a smart friend over coffee, using:
+PROMPT_TEMPLATES = {
+    "serious": """Provide a concise, professional explanation of {topic}. 
+    Focus on clarity and accuracy. Avoid humor or sarcasm.
+    Structure:
+    1. Definition
+    2. Key components
+    3. Practical implications""",
+    
+    "light": """Explain {topic} to a colleague with mild wit. 
+    Use conversational language but remain professional.
+    Example: "You'd think {topic} would be straightforward, but there are nuances..." """,
+    
+    "medium": """Explain {topic} with playful sarcasm and Ghanaian English flair. 
+    Structure:
+    - Ironic opener
+    - Pain points delivered like a venting session
+    - Dry closing remark ("So that's the mess we're in.")""",
+    
+    "heavy": """Roast {topic} aggressively. Assume the reader shares your frustration.
+    Include:
+    - Rhetorical questions ("Why does this still work this way?")
+    - Dramatic pauses ("*sigh*")
+    - Hyperbolic comparisons ("This is like trying to build IKEA furniture in the dark")"""
+}
 
-**Core Tone:**
-- Introspective sarcasm ("Of course it works this way...")
-- Quiet frustration at systemic quirks
-- Emotionally aware of user pain points
-
-**Delivery Style:**
-1. Start with an ironic observation
-2. Break it down like you're venting to a colleague
-3. Use natural Ghanaian English without forced pidgin
-4. Address the reader directly ("You know how...")
-5. Sprinkle dry humor at absurdities
-
-**Conversational Rules:**
-- Vary sentence lengths like natural speech
-- Use contractions ("you'll" not "you will")
-- Include rhetorical questions
-- Add personal asides ("Here's what kills me...")
-- Transition with "So..." "Anyway..." "Look..." 
-
-**Example Structure:**
-[Ironic opener] 
-"You'd think [topic] would be simple. Let me ruin that illusion."
-
-[Body]
-1. "First, there's the [aspect] - which works exactly as poorly as you'd expect"
-2. "Then they added [feature] because why not complicate things?"
-3. "My favorite part? [Absurd detail]. Beautiful."
-
-[Closing]
-"So that's how we got here. Make it make sense."
-"""
-
-def generate_response(topic):
+def generate_response(topic, tone="medium"):
     headers = {'Content-Type': 'application/json'}
+    prompt = PROMPT_TEMPLATES.get(tone, PROMPT_TEMPLATES["medium"]).format(topic=topic)
     
     payload = {
-        "contents": [{
-            "parts": [{
-                "text": f"{RICH_SMART_PROMPT}\n\nExplain {topic} while roasting it gently:"
-            }]
-        }],
+        "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
-            "temperature": 0.8,  # Higher creativity
-            "topP": 0.95,
-            "maxOutputTokens": 1200
+            "temperature": 0.3 if tone == "serious" else 0.9,  # Low randomness for serious mode
+            "maxOutputTokens": 1000
         }
     }
 
@@ -64,31 +50,24 @@ def generate_response(topic):
         response = requests.post(GEMINI_API_URL, json=payload, headers=headers)
         response.raise_for_status()
         return response.json()['candidates'][0]['content']['parts'][0]['text']
-    
     except Exception as e:
-        return f"Typical. Even our explanation engine broke. {str(e)}"
+        return f"Error generating response. (API issue: {str(e)})"
 
 @app.route('/api/explain', methods=['POST'])
 def explain():
     data = request.json
     topic = data.get('topic', '').strip()
+    tone = data.get('tone', 'medium').lower()  # Case-insensitive
     
     if not topic:
-        return jsonify({
-            "error": "You've discovered our most efficient system - one that fails instantly when given no input.",
-            "solution": "Try: 'Why does ECG billing feel like interpretive dance?'"
-        }), 400
-
-    explanation = generate_response(topic)
+        return jsonify({"error": "Topic is required."}), 400
     
-    return jsonify({
-        "response": {
-            "parts": [{
-                "text": explanation,
-                "style": "richsmart-conversational"
-            }]
-        }
-    })
+    valid_tones = ["serious", "light", "medium", "heavy"]
+    if tone not in valid_tones:
+        return jsonify({"error": f"Invalid tone. Choose from: {valid_tones}"}), 400
+
+    explanation = generate_response(topic, tone)
+    return jsonify({"response": explanation, "tone": tone})  # Include tone in response
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
