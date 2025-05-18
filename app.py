@@ -1,59 +1,95 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS  # ✅ Enable cross-origin requests
+from flask_cors import CORS
 import requests
 import os
 
 app = Flask(__name__)
-CORS(app)  # ✅ This allows your frontend (even from file:// or localhost) to connect
+CORS(app)
 
-# Gemini API setup
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')  # Must be set in Render environment
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
 
-# Generate response using Gemini
-def generate_ghanaba_response(topic):
-    headers = {
-        'Content-Type': 'application/json',
-    }
+RICH_SMART_PROMPT = """
+You're explaining {topic} to a smart friend over coffee, using:
+
+**Core Tone:**
+- Introspective sarcasm ("Of course it works this way...")
+- Quiet frustration at systemic quirks
+- Emotionally aware of user pain points
+
+**Delivery Style:**
+1. Start with an ironic observation
+2. Break it down like you're venting to a colleague
+3. Use natural Ghanaian English without forced pidgin
+4. Address the reader directly ("You know how...")
+5. Sprinkle dry humor at absurdities
+
+**Conversational Rules:**
+- Vary sentence lengths like natural speech
+- Use contractions ("you'll" not "you will")
+- Include rhetorical questions
+- Add personal asides ("Here's what kills me...")
+- Transition with "So..." "Anyway..." "Look..." 
+
+**Example Structure:**
+[Ironic opener] 
+"You'd think [topic] would be simple. Let me ruin that illusion."
+
+[Body]
+1. "First, there's the [aspect] - which works exactly as poorly as you'd expect"
+2. "Then they added [feature] because why not complicate things?"
+3. "My favorite part? [Absurd detail]. Beautiful."
+
+[Closing]
+"So that's how we got here. Make it make sense."
+"""
+
+def generate_response(topic):
+    headers = {'Content-Type': 'application/json'}
+    
     payload = {
-        "contents": [
-            {
-                "parts": [
-                    {"text": f"Explain {topic} in a fun Ghanaian style like Ghanaba would."}
-                ]
-            }
-        ]
+        "contents": [{
+            "parts": [{
+                "text": f"{RICH_SMART_PROMPT}\n\nExplain {topic} while roasting it gently:"
+            }]
+        }],
+        "generationConfig": {
+            "temperature": 0.8,  # Higher creativity
+            "topP": 0.95,
+            "maxOutputTokens": 1200
+        }
     }
 
-    response = requests.post(GEMINI_API_URL, json=payload, headers=headers)
+    try:
+        response = requests.post(GEMINI_API_URL, json=payload, headers=headers)
+        response.raise_for_status()
+        return response.json()['candidates'][0]['content']['parts'][0]['text']
+    
+    except Exception as e:
+        return f"Typical. Even our explanation engine broke. {str(e)}"
 
-    if response.status_code == 200:
-        data = response.json()
-        try:
-            generated_text = data['candidates'][0]['content']
-            return generated_text
-        except (KeyError, IndexError):
-            return "Sorry, no explanation was generated."
-    else:
-        return f"Error from Gemini API: {response.status_code} - {response.text}"
-
-# POST endpoint for explanations
 @app.route('/api/explain', methods=['POST'])
 def explain():
     data = request.json
-    topic = data.get('topic', '')
+    topic = data.get('topic', '').strip()
+    
     if not topic:
-        return jsonify({"error": "No topic provided"}), 400
+        return jsonify({
+            "error": "You've discovered our most efficient system - one that fails instantly when given no input.",
+            "solution": "Try: 'Why does ECG billing feel like interpretive dance?'"
+        }), 400
 
-    explanation = generate_ghanaba_response(topic)
-    return jsonify({"response": explanation})
+    explanation = generate_response(topic)
+    
+    return jsonify({
+        "response": {
+            "parts": [{
+                "text": explanation,
+                "style": "richsmart-conversational"
+            }]
+        }
+    })
 
-# Root route
-@app.route('/')
-def home():
-    return "Welcome to Ghanaba API. It's alive!"
-
-# Run app
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(host="0.0.0.0", port=port)
