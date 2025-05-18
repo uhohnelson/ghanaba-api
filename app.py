@@ -4,7 +4,7 @@ import os
 
 app = Flask(__name__)
 
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')  # Make sure you set this in your Render environment
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')  # Make sure this is set in Render environment
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
 
 def generate_ghanaba_response(topic):
@@ -33,7 +33,8 @@ def generate_ghanaba_response(topic):
     else:
         return f"Error from Gemini API: {response.status_code} - {response.text}"
 
-@app.route('/explain', methods=['POST'])
+# ✅ Updated route here
+@app.route('/api/explain', methods=['POST'])
 def explain():
     data = request.json
     topic = data.get('topic', '')
