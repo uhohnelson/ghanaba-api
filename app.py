@@ -1,12 +1,16 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS  # ✅ Enable cross-origin requests
 import requests
 import os
 
 app = Flask(__name__)
+CORS(app)  # ✅ This allows your frontend (even from file:// or localhost) to connect
 
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')  # Make sure this is set in Render environment
+# Gemini API setup
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')  # Must be set in Render environment
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
 
+# Generate response using Gemini
 def generate_ghanaba_response(topic):
     headers = {
         'Content-Type': 'application/json',
@@ -33,8 +37,8 @@ def generate_ghanaba_response(topic):
     else:
         return f"Error from Gemini API: {response.status_code} - {response.text}"
 
-# ✅ Updated route here
-@app.route('/api/explain', methods=['POST'])
+# POST endpoint for explanations
+@app.route('/explain', methods=['POST'])
 def explain():
     data = request.json
     topic = data.get('topic', '')
@@ -44,10 +48,12 @@ def explain():
     explanation = generate_ghanaba_response(topic)
     return jsonify({"response": explanation})
 
+# Root route
 @app.route('/')
 def home():
     return "Welcome to Ghanaba API. It's alive!"
 
+# Run app
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
